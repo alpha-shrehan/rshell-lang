@@ -1,0 +1,5 @@
+$num = @int(10);
+$seq = "
+    hello World
+    its a brand new day
+";

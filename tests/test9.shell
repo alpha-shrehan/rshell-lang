@@ -1,0 +1,10 @@
+$test($a) {
+    echo {$a};
+};
+
+$a = @int(10);
+L1:
+$test($a);
+$a++;
+
+goto L1;

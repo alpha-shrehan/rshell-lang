@@ -1,0 +1,13 @@
+$num = @int(10);
+$arr = "
+    hello World
+    its a brand new day
+";
+
+$f = @float(10.33);
+
+$t = l $num @int(11);
+$t = g $num @int(9);
+$t = leq $num @int(10);
+$t = geq $num @float(9.5);
+$t = g $num $f;

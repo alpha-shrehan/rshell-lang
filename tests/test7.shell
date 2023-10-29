@@ -1,0 +1,11 @@
+$test($a) {
+    if l $a @int(5) {
+        ;
+    } else {
+        echo {$a};
+        $a--;
+        $test($a);
+    };
+};
+
+$test(@int(10));

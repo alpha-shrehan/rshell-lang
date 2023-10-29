@@ -1,0 +1,3 @@
+[submodule "bdwgc"]
+	path = bdwgc
+	url = ./lib/bdwgc

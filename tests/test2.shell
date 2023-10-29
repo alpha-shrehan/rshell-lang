@@ -1,0 +1,27 @@
+$num = `grch`; // get and return char
+spec $num type int;
+
+L1:
+echo $num;
+
+if g $num 0 { // g = greater
+    $num--;
+    goto L1;
+};
+
+// Program 2
+
+$num = @int(10);
+$str = "Hello, World!"; // @str deprecated
+$arr = @seq(1, 2, 3, 4);
+
+$i = 0;
+
+L1:
+echo {$arr[i]};
+
+if l $i $arr.len {
+    goto L1;
+};
+
+echo "Program Ended";

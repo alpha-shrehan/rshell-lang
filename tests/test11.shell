@@ -1,0 +1,9 @@
+$a = @seq(1, 2, "hello", 4, 5, @int(10), @float(10.5), null);
+$b = @int(0);
+
+L1:
+if neq $a[$b] null {
+    echo {$a[$b]};
+    $b++;
+    goto L1;
+};

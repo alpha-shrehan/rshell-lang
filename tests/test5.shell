@@ -1,0 +1,26 @@
+if eq @int(10) @int(20)
+{
+    echo Inside if;
+}
+elif g @int(10) @int(30)
+{
+    echo Inside elif;
+}
+elif l @int(30) @float(10)
+{
+    echo Inside elif 2;
+}
+elif neq @int(20) @int(10)
+{
+    echo Inside elif 3;
+}
+else 
+{
+    if @str() {
+        echo In block;
+    } else {
+        echo In else block;
+    };
+};
+
+echo End;

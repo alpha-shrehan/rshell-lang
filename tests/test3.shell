@@ -1,0 +1,15 @@
+$num = @int(10);
+$arr = "
+    hello World
+    its a brand new day
+";
+
+if l $num @int(10) {
+    echo {$num} is less than 10;
+}
+elif eq $num @int(10) {
+    echo {$num} is equal to 10;
+}
+else {
+    echo {$num} is greater than 10;
+};

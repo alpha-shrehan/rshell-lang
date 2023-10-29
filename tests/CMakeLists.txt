@@ -1,0 +1,5 @@
+include_directories(../)
+add_executable(01_exe 01.c)
+include_directories(${CMAKE_SOURCE_DIR}/lib/bdwgc/include/)
+target_link_libraries(01_exe rsshell)
+add_test(NAME 01 COMMAND 01_exe)

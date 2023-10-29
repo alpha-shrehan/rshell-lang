@@ -1,0 +1,35 @@
+/* var decl */
+            res.type = RSL_STMT_VAR_DECL;
+            int nidx = i + 1;
+            char *vn = NULL;
+
+            for (size_t j = nidx; j < dl; j++)
+            {
+                char d = data[j];
+
+                if (d == ' ' || d == '=')
+                {
+                    nidx = j;
+                    break;
+                }
+            }
+            int p = nidx - (i + 1);
+
+            vn = RSHELL_Malloc(
+                (p + 1) * sizeof(char));
+
+            strncpy(vn, data + i + 1, p);
+            vn[p] = '\0';
+
+            dprintf("[varname: %s]\n", vn);
+
+            res.v.var_decl.name = vn;
+            i = nidx;
+
+            while (i < dl &&
+                   data[i] != '=')
+                i++;
+            i++;
+
+            res.v.var_decl.val = RSHELL_Strdup(data + i);
+            goto lo;

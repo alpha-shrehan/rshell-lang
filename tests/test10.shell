@@ -1,0 +1,12 @@
+use @float;
+
+$a = @float(10.2);
+$b = leq $a 10.3;
+echo $b;
+
+use @int;
+
+$c = 20;
+$d = eq $c 20;
+$e = eq $c @int(20);
+echo {$c} {$d} {$e};

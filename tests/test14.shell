@@ -1,0 +1,14 @@
+class Test {
+    $a = null;
+    $b = null;
+
+    $init($a, $b) {
+        echo {+ $a $b};
+    };
+
+    $del() {
+        echo deleting;
+    };
+};
+
+$Test->init(@int(10), @int(20));
