@@ -16,7 +16,8 @@ rshell_fun_init (void)
 }
 
 RSHELL_API fun_t *
-rshell_fun_new (char *_Name, char **_Args, size_t _ArgCount, bool _IsNative)
+rshell_fun_new (char *_Name, char **_Args, size_t _ArgCount, bool _IsNative,
+                struct _rshell_mod_stru *_Parent)
 {
   fun_t *f = RSHELL_Malloc (sizeof (fun_t));
 
@@ -25,6 +26,7 @@ rshell_fun_new (char *_Name, char **_Args, size_t _ArgCount, bool _IsNative)
   f->arg_count = _ArgCount;
   f->isnative = _IsNative;
   f->id = -1;
+  f->parent = _Parent;
 
   return f;
 }
@@ -86,7 +88,7 @@ rshell_fun_addNativeFunctions (mod_t *m, int _fc, ...)
       {
         char **arglist = RSHELL_Malloc (sizeof (char *));
         *arglist = RSHELL_Strdup ("iterable");
-        fun_t *f = rshell_fun_new ("len", arglist, 1, 1);
+        fun_t *f = rshell_fun_new ("len", arglist, 1, 1, NULL);
         f->v.f_native = rshell_native_routine_len;
 
         rshell_fun_add (f);

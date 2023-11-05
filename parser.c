@@ -15,6 +15,8 @@ struct _fd_arg_s _fd_arg_parse (char *);
 expr_t *_rs_eval_arithmetic (expr_t *, mod_t *, pret_t *);
 expr_t *_rs_call_function (fun_t *, expr_t **, int, mod_t *, pret_t *);
 
+void _rs_cmd_parse_args (char **, size_t, mod_t *, pret_t *);
+
 bool
 contains_global (mod_t *mod, char *s)
 {
@@ -137,42 +139,7 @@ _rshell_parse_tree (mod_t *mod)
             size_t arg_count = 0;
             char **args = _arg_sep_space (s.v.stmt_cmd.args, &arg_count);
 
-            for (size_t j = 0; j < arg_count; j++)
-              {
-                // if (*args[j] == '$' || *args[j] == '\'' || *args[j] == '\"'
-                //     || *args[j] == '@')
-                //   {
-                //     char *pres_arg = args[j];
-                //     expr_t *r = rshell_parser_expr_eval (args[j], mod,
-                //     &res);
-
-                //     args[j] = rshell_expr_toStr (r);
-                //     // args[j] = RSHELL_Strdup ("<test>");
-
-                //     rshell_expr_free (r);
-                //     RSHELL_Free (pres_arg);
-                //   }
-                if (*args[j] == '{' && args[j][strlen (args[j]) - 1] == '}')
-                  {
-                    char *ac = RSHELL_Strdup (args[j] + 1);
-                    ac[strlen (ac) - 1] = '\0';
-                    RSHELL_Free (args[j]);
-
-                    expr_t *ev = rshell_parser_expr_eval (ac, mod, &res);
-                    args[j] = rshell_expr_toStr (ev);
-
-                    rshell_expr_free (ev);
-                    RSHELL_Free (ac);
-                  }
-                if (*args[j] == '\\' && args[j][1] == '{')
-                  {
-                    char *ac = RSHELL_Strdup (args[j] + 1);
-                    RSHELL_Free (args[j]);
-                    args[j] = ac;
-                  }
-
-                // printf ("%s\n", args[j]);
-              }
+            _rs_cmd_parse_args (args, arg_count, mod, &res);
 
             fs_t *fs = rshell_cmd_fs_new (true);
             cmd_t *cmd = rshell_cmd_get (s.v.stmt_cmd.name);
@@ -198,6 +165,11 @@ _rshell_parse_tree (mod_t *mod)
                 char **ebdy_sts = rshell_str_split_delim (s.v.block_if.body,
                                                           &ed_count, ';');
 
+                // for (size_t j = 0; j < ed_count; j++)
+                //   {
+                //     printf ("{%s}\n", ebdy_sts[j]);
+                //   }
+
                 s.v.block_if.body_ast
                     = RSHELL_Malloc ((s.v.block_if.body_ast_count = ed_count)
                                      * sizeof (stmt_t));
@@ -208,6 +180,9 @@ _rshell_parse_tree (mod_t *mod)
 
                     RSHELL_Free (ebdy_sts[j]);
                   }
+
+                rshell_ast_preprocess_tree (&s.v.block_if.body_ast,
+                                            &s.v.block_if.body_ast_count);
 
                 RSHELL_Free (ebdy_sts);
                 ebdy_sts = NULL;
@@ -238,6 +213,10 @@ _rshell_parse_tree (mod_t *mod)
                         RSHELL_Free (ebdy_sts[k]);
                       }
 
+                    rshell_ast_preprocess_tree (
+                        &s.v.block_if.elif_bodies_ast[j],
+                        &s.v.block_if.elif_body_ast_size_counts[j]);
+
                     RSHELL_Free (ebdy_sts);
                     ebdy_sts = NULL;
                     ed_count = 0;
@@ -260,6 +239,10 @@ _rshell_parse_tree (mod_t *mod)
 
                         RSHELL_Free (ebdy_sts[j]);
                       }
+
+                    rshell_ast_preprocess_tree (
+                        &s.v.block_if.body_else_ast,
+                        &s.v.block_if.body_else_ast_count);
 
                     RSHELL_Free (ebdy_sts);
                     ebdy_sts = NULL;
@@ -403,7 +386,7 @@ _rshell_parse_tree (mod_t *mod)
                 rshell_trim (s.v.fun_decl.fname),
                 (char **)RSHELL_Malloc (s.v.fun_decl.arg_count
                                         * sizeof (char *)),
-                s.v.fun_decl.arg_count, false);
+                s.v.fun_decl.arg_count, false, mod);
 
             bool saw_def = false;
 
@@ -447,7 +430,9 @@ _rshell_parse_tree (mod_t *mod)
             expr_t *ev = NULL;
 
             if (s.v.fun_call.eval_callee)
-              ev = rshell_parser_expr_eval (fname, mod, &res);
+              {
+                ev = rshell_parser_expr_eval (fname, mod, &res);
+              }
             else
               {
                 if (*fname == '$')
@@ -464,6 +449,24 @@ _rshell_parse_tree (mod_t *mod)
               {
                 arg_list[j] = rshell_parser_expr_eval (s.v.fun_call.args[j],
                                                        mod, &res);
+              }
+
+            if (ev->meta.ap_count)
+              {
+                int p1 = s.v.fun_call.arg_count;
+                int p2 = ev->meta.ap_count;
+                int p = p1 + p2;
+
+                arg_list = RSHELL_Realloc (arg_list, p * sizeof (expr_t *));
+
+                for (int j = p1 - 1; j >= 0; j--)
+                  arg_list[j + p2] = arg_list[j];
+
+                for (size_t j = 0; j < p2; j++)
+                  arg_list[j] = ev->meta.arg_pass[j];
+
+                // for (size_t j = 0; j < p; j++)
+                //   printf ("[%d]\n", arg_list[j]->type);
               }
 
             switch (ev->type)
@@ -711,7 +714,8 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
 
                     /* internally allocates to stack */
                     rshell_seq_add (
-                        narr, rshell_parser_expr_eval (expr_data, mod, mgr));
+                        narr, rshell_rst_esAppend (rshell_parser_expr_eval (
+                                  expr_data, mod, mgr)));
 
                     RSHELL_Free (expr_data);
 
@@ -728,8 +732,9 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
                 expr_data[p] = '\0';
 
                 /* internally allocates to stack */
-                rshell_seq_add (narr,
-                                rshell_parser_expr_eval (expr_data, mod, mgr));
+                rshell_seq_add (
+                    narr, rshell_rst_esAppend (
+                              rshell_parser_expr_eval (expr_data, mod, mgr)));
 
                 RSHELL_Free (expr_data);
 
@@ -783,12 +788,16 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
         case '\'':
         case '\"':
           {
-            int send = rget_next_chr (s, d, i + 1, 1, 0);
+            int send = rget_next_chr (s, d, i, 1,
+                                      0); /* i NOT i+1 because string rules are
+                                             before matching chars */
             int p = send - i - 1;
 
             char *sr = RSHELL_Malloc ((p + 1) * sizeof (char));
             strncpy (sr, s + i + 1, p);
             sr[p] = '\0';
+
+            // printf ("%s\n", sr);
 
             if (!!e)
               rshell_expr_free (e);
@@ -1010,7 +1019,7 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
               {
                 char c = s[j];
 
-                if (!isalnum (c))
+                if (!(isalnum (c) || c == '_'))
                   break;
 
                 vname[vc++] = c;
@@ -1019,16 +1028,26 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
             vname[vc++] = '\0';
 
             expr_t *vg = rshell_parser_mod_var_get (mod, vname);
-            assert (!!vg && "Var not found");
+            // printf ("%s\n", rshell_expr_toStr (vg));
+
+            if (!vg)
+              {
+                here;
+                printf ("%s\n", vname);
+                assert (0 && "Var not found");
+              }
 
             // *e = *vg;
             if (!!e)
               rshell_expr_free (e);
             e = rshell_expr_copy (vg);
+            // here;
 
             RSHELL_Free (vname);
+            // here;
 
             i = j - 1;
+            // printf ("%c\n", s[i]);
             goto L0;
           }
           break;
@@ -1105,9 +1124,9 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
                 int al = 0;
                 int ci = rget_next_chr (dat_enc, ',', 0, 1, 1);
 
-                if (ci == datlen)
+                if (ci == datlen) /* either 1 or no arguments */
                   {
-                    if (datlen)
+                    if (datlen) /* 1 argument */
                       {
                         arglist = RSHELL_Malloc (sizeof (expr_t *));
                         *arglist = rshell_parser_expr_eval (dat_enc, mod, mgr);
@@ -1174,6 +1193,14 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
                       e = rshell_expr_new (RSHELL_EXPR_COBJ);
                       e->v.e_cobj.id = obj->meta.id;
 
+                      arglist = RSHELL_Realloc (arglist,
+                                                (al + 1) * sizeof (expr_t *));
+
+                      for (int j = al; j > -1; j--)
+                        arglist[j + 1] = arglist[j];
+                      arglist[0] = rshell_expr_copy (e);
+                      al++;
+
                       if (_f_init != NULL)
                         {
                           fun_t *f
@@ -1182,15 +1209,8 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
                           expr_t *this_ptr
                               = rshell_rst_esAppend (rshell_expr_copy (e));
 
-                          rshell_vtable_add (m->vt, "this", (void *)this_ptr);
-                          rshell_rst_esModifyObjCount (this_ptr, 1);
-
                           rshell_expr_free (
                               _rs_call_function (f, arglist, al, m, mgr));
-
-                          rshell_vtable_remove (
-                              m->vt, "this"); /* internally calls
-                                                 rshell_rst_esModifyObjCount */
                         }
                     }
                     break;
@@ -1223,7 +1243,7 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
 
             /* get attribute name */
             int word_ei = i + 2;
-            while (isalnum (s[word_ei]))
+            while (isalnum (s[word_ei]) || s[word_ei] == '_')
               word_ei++;
 
             int p = word_ei - i - 2;
@@ -1266,6 +1286,11 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
 
                   rshell_expr_free (e);
                   e = rshell_expr_copy (v);
+
+                  rshell_expr_addToArgPass (
+                      e, rshell_expr_fromExpr (
+                             (expr_t){ .type = RSHELL_EXPR_COBJ,
+                                       .v.e_cobj.id = ct->meta.id }));
 
                   m->parent = par;
                 }
@@ -1333,11 +1358,15 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
           break;
         case '`':
           {
-            int tick_end = rget_next_chr (s, '`', i + 1, 1, 1);
+            int tick_end
+                = rget_next_chr (s, '`', i, 1, 1); /* IT WILL BE i NOT i+1 */
             int p = tick_end - i - 1;
+            // printf ("%c\n", s[tick_end]);
             char *_cmd = RSHELL_Malloc ((p + 1) * sizeof (char));
             strncpy (_cmd, s + i + 1, p);
             _cmd[p] = '\0';
+
+            // printf ("%s\n", _cmd);
 
             char *cmd_name = NULL, *cmd_args = NULL;
             int first_space_idx = rget_next_chr (_cmd, ' ', 0, 1, 1);
@@ -1351,24 +1380,7 @@ rshell_parser_expr_eval (char *s, mod_t *mod, pret_t *mgr)
 
             size_t arg_count = 0;
             char **args = _arg_sep_space (cmd_args, &arg_count);
-
-            for (size_t j = 0; j < arg_count; j++)
-              {
-                if (*args[j] == '$' || *args[j] == '\'' || *args[j] == '\"'
-                    || *args[j] == '@')
-                  {
-                    char *pres_arg = args[j];
-                    expr_t *r = rshell_parser_expr_eval (args[j], mod, mgr);
-
-                    args[j] = rshell_expr_toStr (r);
-                    // args[j] = RSHELL_Strdup ("<test>");
-
-                    rshell_expr_free (r);
-                    RSHELL_Free (pres_arg);
-                  }
-
-                // printf ("%s\n", args[j]);
-              }
+            _rs_cmd_parse_args (args, arg_count, mod, mgr);
 
             fs_t *fs = rshell_cmd_fs_new (false);
             cmd_t *cmd = rshell_cmd_get (cmd_name);
@@ -1853,7 +1865,7 @@ _rs_call_function (fun_t *f, expr_t **arglist, int arg_count, mod_t *mod,
                    pret_t *mgr)
 {
   expr_t *e = NULL;
-  mod_t *m = rshell_parser_mod_new (NULL, 0, mod);
+  mod_t *m = rshell_parser_mod_new (NULL, 0, f->parent);
 
   assert (f->arg_count == arg_count && "Invalid number of arguments passed.");
 
@@ -1861,11 +1873,12 @@ _rs_call_function (fun_t *f, expr_t **arglist, int arg_count, mod_t *mod,
     {
       struct _fd_arg_s ca = _fd_arg_parse (f->args[j]);
 
-      rshell_vtable_add (m->vt, ca.name,
-                         (void *)rshell_rst_esAppend (arglist[j]));
+      expr_t *_ev = rshell_rst_esAppend (rshell_expr_copy (arglist[j]));
+
+      rshell_vtable_add (m->vt, ca.name, (void *)_ev);
 
       RSHELL_Free (ca.val);
-      rshell_rst_esModifyObjCount (arglist[j], 1);
+      rshell_rst_esModifyObjCount (_ev, 1);
     }
 
   if (f->isnative)
@@ -1884,6 +1897,60 @@ _rs_call_function (fun_t *f, expr_t **arglist, int arg_count, mod_t *mod,
       e->v.e_int.val = 0;
     }
 
+  m->parent = NULL;
   rshell_parser_mod_free (m);
   return e;
+}
+
+void
+_rs_cmd_parse_args (char **args, size_t arg_count, mod_t *mod, pret_t *mgr)
+{
+  for (size_t j = 0; j < arg_count; j++)
+    {
+      // if (*args[j] == '$' || *args[j] == '\'' || *args[j] == '\"'
+      //     || *args[j] == '@')
+      //   {
+      //     char *pres_arg = args[j];
+      //     expr_t *r = rshell_parser_expr_eval (args[j], mod,
+      //     mgr);
+
+      //     args[j] = rshell_expr_toStr (r);
+      //     // args[j] = RSHELL_Strdup ("<test>");
+
+      //     rshell_expr_free (r);
+      //     RSHELL_Free (pres_arg);
+      //   }
+      if (*args[j] == '{' && args[j][strlen (args[j]) - 1] == '}')
+        {
+          char *ac = RSHELL_Strdup (args[j] + 1);
+          ac[strlen (ac) - 1] = '\0';
+          RSHELL_Free (args[j]);
+
+          expr_t *ev = rshell_parser_expr_eval (ac, mod, mgr);
+          args[j] = rshell_expr_toStr (ev);
+
+          rshell_expr_free (ev);
+          RSHELL_Free (ac);
+        }
+      if (*args[j] == '\\' && args[j][1] == '{')
+        {
+          char *ac = RSHELL_Strdup (args[j] + 1);
+          RSHELL_Free (args[j]);
+          args[j] = ac;
+        }
+      if (*args[j] == '\"' || *args[j] == '\'')
+        {
+          char *ac = RSHELL_Strdup (args[j] + 1);
+          ac[strlen (ac) - 1] = '\0';
+
+          char *p = ac;
+          ac = rshell_unescape_str (ac);
+          RSHELL_Free (p);
+
+          RSHELL_Free (args[j]);
+          args[j] = ac;
+        }
+
+      // printf ("%s\n", args[j]);
+    }
 }

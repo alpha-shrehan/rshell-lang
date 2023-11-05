@@ -74,6 +74,9 @@ struct _rshell_expr_stru
     bool isallocated;
     int id;
     int objcount;
+    struct _rshell_expr_stru *
+        *arg_pass; /* argument array to pass internally, like $this. */
+    size_t ap_count;
   } meta;
 };
 
@@ -93,6 +96,8 @@ extern "C"
   RSHELL_API char *rshell_expr_toStr (expr_t *);
   RSHELL_API bool rshell_expr_toBool (expr_t *);
   RSHELL_API expr_t *rshell_expr_copy (expr_t *);
+  RSHELL_API void
+  rshell_expr_addToArgPass (expr_t *, expr_t *); /* only copies .v and .type */
 
 #ifdef __cplusplus
 }

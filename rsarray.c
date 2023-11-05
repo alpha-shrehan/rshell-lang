@@ -38,6 +38,7 @@ rshell_seq_new (void)
 RSHELL_API void
 rshell_seq_free (array_t *t)
 {
+  // here;
   for (size_t i = 0; i < t->size; i++)
     rshell_rst_esModifyObjCount (t->vals[i], -1);
 

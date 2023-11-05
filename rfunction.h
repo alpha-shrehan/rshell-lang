@@ -14,6 +14,7 @@ struct _rshell_rfun_stru
   size_t arg_count;
   bool isnative;
   int id;
+  struct _rshell_mod_stru *parent;
 
   union
   {
@@ -38,7 +39,8 @@ extern "C"
 
   RSHELL_API void rshell_fun_init (void);
   RSHELL_API fun_t *rshell_fun_new (char *_Name, char **_Args,
-                                    size_t _ArgCount, bool _IsNative);
+                                    size_t _ArgCount, bool _IsNative,
+                                    struct _rshell_mod_stru *_Parent);
   RSHELL_API fun_t *rshell_fun_add (fun_t *);
   RSHELL_API fun_t *rshell_fun_get_byID (int);
   RSHELL_API fun_t *rshell_fun_get_byName (char *);

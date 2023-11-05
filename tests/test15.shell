@@ -1,0 +1,15 @@
+use @int;
+use @float;
+
+class Test {
+    $a = 0;
+    $b = 0;
+
+    $init($t) {
+        $this->a = 10;
+        $this->b = $this->a;
+        echo Inside constructor {$this->a} {$this->b} {$t};
+    };
+};
+
+$obj = $Test(1);

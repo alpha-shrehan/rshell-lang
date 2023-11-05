@@ -131,6 +131,8 @@ echo (char **args, int argc, fs_t *fs)
                 /* c.code +=  */ sprintf (fs->buf, "%s ", _curr_arg);
             }
         }
+
+      RSHELL_Free (_curr_arg);
     }
 
   return c;

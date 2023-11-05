@@ -1,3 +1,5 @@
+# Key detecting program. ^C to quit
+
 L1:
 $a = `grch 'Enter: '`;
 

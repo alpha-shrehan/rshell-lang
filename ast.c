@@ -32,13 +32,16 @@ rshell_ast_gen (char *data)
           int nidx = i + 1;
           char *vn = NULL;
 
-          assert (isalpha (data[nidx]) && "Syntax Error.");
+          assert ((isalpha (data[nidx]) || data[nidx] == '_')
+                  && "Syntax Error.");
 
           for (size_t j = nidx; j < dl; j++)
             {
               char d = data[j];
 
-              if (!isalnum (d))
+              if (isalnum (d) || d == '_')
+                ;
+              else
                 {
                   nidx = j;
                   break;
@@ -297,7 +300,9 @@ rshell_ast_gen (char *data)
             {
               char d = data[j];
 
-              if (!isalnum (d))
+              if (isalnum (d) || d == '_')
+                ;
+              else
                 {
                   if (d == ':')
                     is_label = true;
@@ -564,7 +569,7 @@ rshell_ast_gen (char *data)
               res.type = RSL_STMT_MEM_ACCESS;
 
               int word_ei = i + 2;
-              while (isalnum (data[word_ei]))
+              while (isalnum (data[word_ei]) || data[word_ei] == '_')
                 word_ei++;
 
               int p = word_ei - i - 2;
@@ -632,11 +637,53 @@ rget_next_chr (char *data, char tar, int st, bool case_str, bool case_brack)
   int in_str = 0;
   int gb = 0;
   size_t dl = strlen (data);
+  char last_str_tok = 0;
 
   int i;
   for (i = st; i < dl; i++)
     {
       char c = data[i];
+
+      if (case_str)
+        {
+          if (c == '\'' || c == '\"' || c == '`')
+            {
+              // printf ("%d %c\n", last_str_tok, last_str_tok);
+              if (last_str_tok)
+                {
+                  if (c == last_str_tok)
+                    goto L1;
+                }
+              else
+                {
+                L1:
+                  if (i)
+                    {
+                      if (data[i - 1] != '\\')
+                        {
+                          in_str = !in_str;
+                          if (in_str)
+                            last_str_tok = c;
+                        }
+                      else
+                        {
+                          if (i > 1 && data[i - 2] == '\\')
+                            {
+                              in_str = !in_str;
+                              if (in_str)
+                                last_str_tok = c;
+                            }
+                        }
+                    }
+                  else
+                    {
+                      in_str = !in_str;
+                      if (in_str)
+                        last_str_tok = c;
+                    }
+                }
+            }
+        }
 
       if (c == tar)
         {
@@ -660,25 +707,6 @@ rget_next_chr (char *data, char tar, int st, bool case_str, bool case_brack)
                   ;
               else
                 break;
-            }
-        }
-
-      if (case_str)
-        {
-          if (c == '\'' || c == '\"' || c == '`')
-            {
-              if (i)
-                {
-                  if (data[i - 1] != '\\')
-                    in_str = !in_str;
-                  else
-                    {
-                      if (i > 1 && data[i - 2] == '\\')
-                        in_str = !in_str;
-                    }
-                }
-              else
-                in_str = !in_str;
             }
         }
 
